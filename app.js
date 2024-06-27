@@ -66,6 +66,61 @@ app.get('/api/programas',(req,res) =>{
     })
 })
 
+// mostrar todos las profesiones
+app.get('/api/profesiones',(req,res) =>{
+    conexion.query('SELECT * FROM marketing_db.profesiones;', (error, filas)=>{
+        if(error){
+            throw error;
+        }else{
+            res.send(filas);
+        }
+    })
+})
+
+// mostrar todos las institucion de egreso
+app.get('/api/institucion_egreso',(req,res) =>{
+    conexion.query('SELECT * FROM marketing_db.institucion_egreso;', (error, filas)=>{
+        if(error){
+            throw error;
+        }else{
+            res.send(filas);
+        }
+    })
+})
+
+// mostrar todos los grados academicos
+app.get('/api/grado_academico',(req,res) =>{
+    conexion.query('SELECT * FROM marketing_db.grado_academico;', (error, filas)=>{
+        if(error){
+            throw error;
+        }else{
+            res.send(filas);
+        }
+    })
+})
+
+// mostrar todos los grados academicos
+app.get('/api/grado_academico',(req,res) =>{
+    conexion.query('SELECT * FROM marketing_db.grado_academico;', (error, filas)=>{
+        if(error){
+            throw error;
+        }else{
+            res.send(filas);
+        }
+    })
+})
+
+// mostrar todos las ciudades de recidencia
+app.get('/api/ciudad_recidencia',(req,res) =>{
+    conexion.query('SELECT * FROM marketing_db.ciudad_recidencia;', (error, filas)=>{
+        if(error){
+            throw error;
+        }else{
+            res.send(filas);
+        }
+    })
+})
+
 // Subir los archivos
 // Configuración de Multer(ruta del archivo)
 const storage = multer.diskStorage({
@@ -97,7 +152,7 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     });
   });
 
-  // Crear programa y asociar con imagen
+  // Crear programa y asociar con imagen portada
   app.post('/api/programas', (req, res) => {
     const { nombre, fondoId } = req.body;
     
@@ -110,53 +165,15 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
       }
     });
   });
+
   
-
-// Insertar los datos del certificado en la base de datos y actualiza la tabla inscripcion
-app.post('/api/certificado_conclusion',upload.single('file'), (req, res) => {
-    const { Cod_Estudiante, Estudiante, CargaHoraria } = req.body;
-    const FechaGeneracion = new Date();
-
-    const archivoPath = `uploads/${req.file.filename}`;
-
-        const sqlInsertCertificado = `
-            INSERT INTO marketing_db.fondo_programa
-            (Estudiante, ArchivoCertificado, CargaHoraria, FechaGeneracion) 
-            VALUES (?, ?, ?, ?)
-        `;
-
-        conexion.query(sqlInsertCertificado, [Estudiante, archivoPath, CargaHoraria, FechaGeneracion], (error, results) => {
-            if (error) {
-                console.error('Error al insertar el certificado:', error);
-                return res.status(500).send('Error al insertar el certificado');
-            }
-
-            const Cod_Certificado_C = results.insertId;
-            const sqlUpdateInscripcion = `
-                UPDATE marketing_db.programas 
-                SET Cod_Fondo_P = ? 
-                WHERE Cod_Programa = ?
-            `;
-
-            conexion.query(sqlUpdateInscripcion, [Cod_Certificado_C, Cod_Estudiante], (error, results) => {
-                if (error) {
-                    console.error('Error al actualizar la inscripción:', error);
-                    return res.status(500).send('Error al actualizar la inscripción');
-                }
-                  // Enviar mensaje a todos los clientes WebSocket
-                    wss.clients.forEach(client => {
-                        if (client.readyState === WebSocket.OPEN) {
-                        client.send(JSON.stringify({ Cod_Estudiante }));
-                        }
-                    });
-                res.status(201).send({ message: 'Certificado insertado y inscripción actualizada correctamente', id: Cod_Certificado_C });
-            });
-        });
-});
 // Busca la portada del programa
-app.get('/api/fondo_certificados', (req, res) => {
-    const codPrograma = 2;
-    const sql = `SELECT 
+app.get('/api/portada_programa', (req, res) => {
+    const codPrograma = req.query.Cod_Programa;
+    if (!codPrograma) {
+        return res.status(400).send('Falta el parámetro Cod_Programa');
+    }
+        const sql = `SELECT 
                 p.Nombre,
                 fp.*
                 FROM 
@@ -170,7 +187,7 @@ app.get('/api/fondo_certificados', (req, res) => {
                 ORDER BY 
                     fp.Cod_Fondo_P DESC
                 LIMIT 1;`;
-    conexion.query(sql, (error, result) => {
+    conexion.query(sql, [codPrograma], (error, result) => { // Pasar codPrograma como parámetro
         if (error) {
             console.error('Error al consultar la base de datos:', error);
             return res.status(500).send('Error interno del servidor');
@@ -178,68 +195,7 @@ app.get('/api/fondo_certificados', (req, res) => {
         if (result.length > 0) {
             res.send(result[0]);
         } else {
-            res.status(404).send('No se encontró el fondo del certificado');
-        }
-    });
-});
-// mostrar los estudiantes con inscripcion que tienen un certificado de conclusion asignado.
-app.get('/api/buscar-estudiante-certificado-conclusion',(req,res) =>{
-    const query = `
-    SELECT 
-    estudiante.Cod_Estudiante,
-    estudiante.Carnet,
-    estudiante.Nombre,
-    estudiante.Apellido,
-    inscripcion.Cod_Inscripcion,
-    inscripcion.Cod_Programa,
-    inscripcion.fechaInscripcion,
-    certificado_conclusion.Cod_Certificado_C,
-    certificado_conclusion.Estudiante AS Estudiante_Certificado,
-    certificado_conclusion.FechaGeneracion,
-    certificado_conclusion.ArchivoCertificado,
-    certificado_conclusion.CargaHoraria
-FROM 
-    seguimiento_db.estudiante AS estudiante
-JOIN 
-    seguimiento_db.inscripcion AS inscripcion ON estudiante.Cod_Estudiante = inscripcion.Cod_Estudiante
-JOIN 
-    seguimiento_db.certificado_conclusion AS certificado_conclusion ON inscripcion.Cod_Certificado_C = certificado_conclusion.Cod_Certificado_C
-    WHERE 
-    inscripcion.Cod_Certificado_C IS NOT NULL;
-    `;
-        conexion.query(query, (error, resultados)=>{
-        if (error) {
-            console.error('Error al consultar la base de datos:', error);
-            return res.status(500).send('Error interno del servidor');
-        }
-
-        if (resultados.length > 0) {
-            res.send(resultados);
-        } else {
-            res.status(404).send('Certificados con inscripcion no encontrados');
-        }
-    })
-})
-
-// mostrar si se genero  certificado de un estudiante
-app.get('/api/verificar-certificado-conclusion/:cod_programa', (req, res) => {
-    const codPrograma = req.params.cod_programa;
-    const query = `
-        SELECT Cod_Fondo_P
-        FROM marketing_db.programas
-        WHERE Cod_Programa = ? AND Cod_Fondo_P IS NOT NULL
-    `;
-
-    conexion.query(query, [codPrograma], (error, results) => {
-        if (error) {
-            console.error('Error al verificar el certificado:', error);
-            return res.status(500).send('Error al verificar el certificado');
-        }
-
-        if (results.length > 0) {
-            res.send({ certificadoGenerado: true });
-        } else {
-            res.send({ certificadoGenerado: false });
+            res.status(404).send('No se encontró la portada del programa');
         }
     });
 });
