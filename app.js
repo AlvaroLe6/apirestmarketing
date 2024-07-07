@@ -120,7 +120,16 @@ app.get('/api/ciudad_residencia',(req,res) =>{
         }
     })
 })
-
+// mostrar todos los asesores
+app.get('/api/asesores',(req,res) =>{
+    conexion.query('SELECT * FROM marketing_db.asesores;', (error, filas)=>{
+        if(error){
+            throw error;
+        }else{
+            res.send(filas);
+        }
+    })
+})
 // Muestra todas las inscripciones con detalles de persona y programa
 app.get('/api/inscripciones_persona', (req, res) => {
     const sql = `
@@ -159,7 +168,7 @@ app.get('/api/inscripciones_persona', (req, res) => {
         if (error) {
             console.error('Error al consultar la base de datos:', error);
             return res.status(500).send('Error interno del servidor');
-        } else {
+        } else {-
             res.send(filas);
         }
     });
@@ -187,7 +196,8 @@ app.get('/api/inscripciones_por_programa', (req, res) => {
             pr.nombre_profesion AS profesion,
             pg.Nombre AS programa,
             ins.fecha_reg,
-            ins.cod_asesor
+            ins.cod_asesor,
+            ase.nombre
     FROM 
         marketing_db.persona p
     JOIN 
@@ -202,6 +212,8 @@ app.get('/api/inscripciones_por_programa', (req, res) => {
         marketing_db.institucion_egreso ie ON p.cod_institucion_e = ie.cod_institucion_e
     JOIN 
         marketing_db.profesiones pr ON p.cod_profesion = pr.cod_profesion
+    JOIN 
+        marketing_db.asesores ase ON ins.cod_asesor = ase.cod_asesor
          where pg.Cod_Programa = ?;
     `;
     conexion.query(sql, [codPrograma], (error, filas) => { // Pasar codPrograma como parámetro
@@ -215,6 +227,27 @@ app.get('/api/inscripciones_por_programa', (req, res) => {
     });
 });
 
+// insertar una nueva persona y su inscripción
+app.post('/api/add_person_and_inscription', (req, res) => {
+    const personData = req.body;
+
+    const sql = `CALL add_person_and_inscription(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    const params = [
+        personData.num_doc, personData.nombres, personData.apellidos, personData.genero, personData.fecha_nac,
+        personData.domicilio, personData.telefono, personData.correo, personData.cod_ciudad_r,
+        personData.cod_grado_a, personData.cod_institucion_e, personData.cod_profesion,
+        personData.cod_programa, personData.cod_asesor
+    ];
+
+    conexion.query(sql, params, (error, results) => {
+        if (error) {
+            console.error('Error al ejecutar el procedimiento almacenado:', error);
+            return res.status(500).send('Error interno del servidor');
+        }
+        res.send(results);
+    });
+});
 
 // Subir los archivos
 // Configuración de Multer(ruta del archivo)
